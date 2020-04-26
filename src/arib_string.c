@@ -366,6 +366,15 @@ static void convert_additional_symbols(unsigned char c1, unsigned char c2, unsig
 			}
 
 		break;
+
+	case 94:
+		if (ARRAY_LENGTH(arib_addchar94_table) > c2 - 1)
+		{
+			strcpy(buf, arib_addchar94_table[c2 - 1]);
+			return;
+		}
+
+		break;
 	}
 
 	fprintf(stderr, "conversion fail: additional_symbol(%d, %d)\n", c1, c2);
