@@ -34,6 +34,7 @@
 #define MPEG2TTS_PN	"MPEG_TS_JP_T"
 
 #define SOAP_PORT	(20081)
+#define SOAP_PATH	"/upnp/control/cds1"
 
 #define CONTENT_LENGTH	"Content-Length:"
 #define CRLF		"\r\n"
@@ -384,28 +385,66 @@ static int find_str(const char *s, const char *d)
 	return -1;
 }
 
-static int parse_args(const char **argv, const char **addr, int *port, char **basename, char **pn)
+static int parse_args(const char **argv, char **addr, int *port, char **path, char **basename, char **pn)
 {
 	const char *s;
-	void *p;
+	char *p;
 	int n;
 
-	*addr = *argv++;
+	s = *argv++;
+	if (!s)
+		return 1;
+
+	*addr = strdup(s);
 	if (!*addr)
 		return 1;
 
-	if (!*argv)
-		return 1;
+	*port = -1;
+	*path = NULL;
 
-	*port = SOAP_PORT;
-	if (**argv >= '0' && **argv <= '9')
+	for (p = *addr; *p; p++)
 	{
-		s = *argv;
-		*port = str2digit(&s);
-		if (*s || *port <= 0 || *port > 65535)
-			*port = SOAP_PORT;
-		else
-			argv++;
+		if (*p == ':')
+		{
+			*p++ = '\0';
+			if (*p < '0' || *p > '9')
+				return 1;
+
+			s = p;
+			*port = str2digit(&s);
+			if (*port <= 0 || *port > 65535)
+				return 1;
+
+			if (*s == '/')
+			{
+				*path = strdup(s);
+				if (!*path)
+					return 1;
+			}
+			else if (*s)
+				return 1;
+
+			break;
+		}
+
+		if (*p == '/')
+		{
+			*path = strdup(p);
+			if (!*path)
+				return 1;
+
+			break;
+		}
+	}
+
+	if (*port < 0)
+		*port = SOAP_PORT;
+
+	if (!*path)
+	{
+		*path = strdup(SOAP_PATH);
+		if (!*path)
+			return 1;
 	}
 
 	s = *argv++;
@@ -690,7 +729,7 @@ out_of_buffer:
 	return NULL;
 }
 
-static int send_create_object(const char *addr, int port, const char *create_req)
+static int send_create_object(const char *addr, int port, const char *path, const char *create_req)
 {
 	char buf[256];
 	int i, n;
@@ -702,13 +741,13 @@ static int send_create_object(const char *addr, int port, const char *create_req
 	i = 0;
 
 	n = snprintf(&buf[i], sizeof (buf) - i,
-		"POST /upnp/control/cds1 HTTP/1.1" CRLF
+		"POST %s HTTP/1.1" CRLF
 		"Host: %s:%d" CRLF
 		"Content-Length: %d" CRLF
 		"Content-Type: text/xml; charset=\"utf-8\"" CRLF
 		"Soapaction: \"urn:schemas-upnp-org:service:ContentDirectory:1#CreateObject\"" CRLF
 		"User-Agent: httppost" CRLF CRLF,
-		addr, port, size);
+		path, addr, port, size);
 	if (n < 0 || n >= sizeof (buf) - i)
 		return -1;
 	i += n;
@@ -1083,7 +1122,7 @@ int check_m2ts_file(const char *basename)
 
 	strcpy(fname, basename);
 	strcat(fname, IMG_EXT);
-printf("%s\n", fname);
+	printf("%s\n", fname);
 
 	fp = fopen(fname, "rb");
 	if (!fp)
@@ -1164,8 +1203,9 @@ int check_post_image_result(int sock)
 
 int main(int argc, const char *argv[])
 {
-	const char *soap_addr;
+	char *soap_addr;
 	int soap_port;
+	char *soap_path;
 	char *basename;
 	char *pn;
 	char *res;
@@ -1182,9 +1222,9 @@ int main(int argc, const char *argv[])
 	}
 #endif /* USE_WINAPI */
 
-	if (parse_args(&argv[1], &soap_addr, &soap_port, &basename, &pn))
+	if (parse_args(&argv[1], &soap_addr, &soap_port, &soap_path, &basename, &pn))
 	{
-		fprintf(stderr, "Usage: %s <dest ip> [dest port]"
+		fprintf(stderr, "Usage: %s <dest addr[:port][/url]"
 			" <m2ts image file> [dlna_org_pn]\n",
 			argv[0]);
 		return 1;
@@ -1192,6 +1232,7 @@ int main(int argc, const char *argv[])
 
 	printf("SOAP addr = %s\n", soap_addr);
 	printf("SOAP port = %d\n", soap_port);
+	printf("SOAP path = %s\n", soap_path);
 	printf("image base = %s\n", basename);
 	printf("DLNA.ORG_PN = %s\n", pn);
 	printf("\n");
@@ -1208,7 +1249,9 @@ int main(int argc, const char *argv[])
 
 	printf("\n");
 
-	sock = send_create_object(soap_addr, soap_port, res);
+	sock = send_create_object(soap_addr, soap_port, soap_path, res);
+	free(soap_addr);
+	free(soap_path);
 	free(res);
 
 	if (sock < 0)
