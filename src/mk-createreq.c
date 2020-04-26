@@ -350,7 +350,7 @@ int main(int argc, const char *argv[])
 		int i;
 
 		pos = -1;
-		for (i = 0; i < fname_m2ts[i]; i++)
+		for (i = 0; fname_m2ts[i]; i++)
 			if (fname_m2ts[i] == '.')
 				pos = i;
 
