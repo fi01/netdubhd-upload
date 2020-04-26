@@ -1250,7 +1250,7 @@ int main(int argc, const char *argv[])
 
 	close(sock);
 
-	if (n == 200)
+	if (n == 200 || n == 201)
 		printf("Success\n");
 	else
 		printf("Failed\n");
