@@ -11,6 +11,13 @@
 #define TS_PID_SIT	(0x001f)
 #define TS_SIT_ID	(0x7f)
 
+
+typedef struct
+{
+	int service_id;
+	int channel;
+} ts_info_channel;
+
 typedef struct
 {
 	const unsigned char *dc_title;
@@ -21,6 +28,8 @@ typedef struct
 	const unsigned char *upnp_longDescription;
 
 	const unsigned char *_longDescription;
+	ts_info_channel *_ts_info;
+	int _num_ts_info;
 } dlna_elements;
 
 unsigned int calc_crc32(const unsigned char *buf, int len);
@@ -61,6 +70,7 @@ void dlna_elements_free(dlna_elements *e)
 	free_if_allocated(&e->upnp_genre);
 	free_if_allocated(&e->upnp_longDescription);
 	free_if_allocated(&e->_longDescription);
+	free_if_allocated((unsigned char const **)&e->_ts_info);
 }
 
 void dump_dlna_elements(const dlna_elements *e)
@@ -231,6 +241,31 @@ void parse_sit(dlna_elements *e, const unsigned char *p)
 
 			free_if_allocated(&e->dc_date);
 			e->dc_date = strdup(datebuf);
+		}
+
+		break;
+
+	case 0xcd:
+		n = (p[3] & 0xfc) >> 2;
+
+		i = 4 + n;
+		n = (p[3] & 3) + i;
+
+		while (i < n)
+		{
+			int j;
+
+			free_if_allocated((unsigned char const **)&e->_ts_info);
+			e->_num_ts_info = p[i + 1];
+			e->_ts_info = malloc(e->_num_ts_info * sizeof e->_ts_info[0]);
+
+			for (j = 0; j < p[i + 1]; j++)
+			{
+				e->_ts_info[j].service_id = p[i + 2 + j * 2] * 256 + p[i + 2 + j * 2 + 1];
+				e->_ts_info[j].channel = p[2] * 10 + j + 1;
+			}
+
+			i += 2 + p[i + 1] * 2;
 		}
 
 		break;
@@ -478,13 +513,17 @@ int main(int argc, const char *argv[])
 				int service_id = sit[off] * 256 + sit[off + 1];
 				int nn;
 
-				printf("service_id: %d\n", service_id);
+				//printf("service_id: %d\n", service_id);
 
 				if (e.arib_objectType && strcmp(e.arib_objectType, "ARIB_TB") != 0)
 					e.upnp_channelNr = service_id * 10;
-// FIX ME!!!
-else
-e.upnp_channelNr = 210;
+				else
+					for (nn = 0; nn < e._num_ts_info; nn++)
+						if (e._ts_info[nn].service_id == service_id)
+						{
+							e.upnp_channelNr = e._ts_info[nn].channel * 10;
+							break;
+						}
 
 				n = (sit[off + 2] & 0x0f) * 256 + sit[off + 3];
 				//printf(" service_loop_length: 0x%x\n", n);
@@ -523,6 +562,9 @@ e.upnp_channelNr = 210;
 
 					print_utf8_string(e.dc_title);
 					printf("\n");
+
+					if (e.upnp_channelNr >= 0)
+						printf("Ch. %03d\n", e.upnp_channelNr);
 
 					if (e.upnp_longDescription)
 					{
