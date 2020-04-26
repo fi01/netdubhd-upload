@@ -471,7 +471,7 @@ int main(int argc, const char *argv[])
 			}
 
 			seclen = get_ts_section_len(sit);
-			bufneed = adaplen + seclen + 3;
+			bufneed = adaplen + seclen + 4;
 
 			//printf("Section length: %d\n", seclen);
 			//printf("buffer need: %d\n", bufneed);
@@ -497,15 +497,15 @@ int main(int argc, const char *argv[])
 			n = (sit[8] & 0x0f) * 256 + sit[9];
 
 			crc32 = calc_crc32(sit, seclen + 3 - 4);
-			//printf("calc CRC32: 0x%08lx\n", crc32);
-			//printf("CRC32: 0x%02x%02x%02x%02x\n",
-			//	sit[seclen + 3 - 4], sit[seclen + 3 - 3], sit[seclen + 3 - 2], sit[seclen + 3 - 1]);
 
 			if (((crc32 & 0xff000000) >> 24) != sit[seclen + 3 - 4]
 			 || ((crc32 & 0x00ff0000) >> 16) != sit[seclen + 3 - 3]
 			 || ((crc32 & 0x0000ff00) >> 8) != sit[seclen + 3 - 2]
 			 || (crc32 & 0x000000ff) != sit[seclen + 3 - 1])
 			{
+				fprintf(stderr, "calc CRC32: 0x%08lx\n", crc32);
+				fprintf(stderr, "CRC32: 0x%02x%02x%02x%02x\n",
+					sit[seclen + 3 - 4], sit[seclen + 3 - 3], sit[seclen + 3 - 2], sit[seclen + 3 - 1]);
 				fprintf(stderr, "CRC is wrong. ignore this SIT\n");
 				started = 0;
 				buflen = 0;
