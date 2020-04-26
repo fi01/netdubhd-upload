@@ -1,5 +1,3 @@
-// UTF-8 text
-
 #ifdef _WIN32
 #define USE_WINAPI 1
 #else
@@ -22,6 +20,10 @@
 #define CP_JIS2022		(50220)
 
 #define MAX_CHAR_BYTES		(4)	// UTF-8
+
+#define CONV_SP_CHAR		"\xe3\x80\x80"
+#define CONV_FAIL_CHAR		"\xe2\x96\xa0"
+#define CONV_UNSUPPORT_CHAR	"\xe2\x96\xa1"
 
 #if !USE_WINAPI
 static iconv_t icd = NULL;
@@ -331,17 +333,22 @@ static void set_codeset_drcs(int idx, unsigned char c, int is_double)
 
 static void conver_single_char(int codeset, unsigned char c, unsigned char buf[])
 {
+	int c_end = BML_DEL - 1;
+
+	if (codeset == PLANE_JIS_X0201_KATAKANA)
+		c_end = BML_DEL;
+
  	c &= 0x7f;
 
 	if (c == BML_SP)
 	{
-		strcpy(buf, "　");
+		strcpy(buf, CONV_SP_CHAR);
 		return;
 	}
 
-	if (c < BML_SP || c > BML_DEL)
+	if (c < BML_SP || c > c_end)
 	{
-		strcpy(buf, "□");
+		strcpy(buf, CONV_FAIL_CHAR);
 		return;
 	}
 
@@ -361,10 +368,14 @@ static void conver_single_char(int codeset, unsigned char c, unsigned char buf[]
 	case PLANE_PROP_ALPHANUMERIC:
 		strcpy(buf, arib_alpahbet_table[c - BML_SP - 1]);
 		return;
+
+	case PLANE_JIS_X0201_KATAKANA:
+		strcpy(buf, arib_0201kana_table[c - BML_SP - 1]);
+		return;
 	}
 
 	fprintf(stderr, "codeset(0x%x) is not supported\n", codeset);
-	strcpy(buf, "□");
+	strcpy(buf, CONV_UNSUPPORT_CHAR);
 }
 
 static void convert_double_char(int codeset, unsigned char b, unsigned char b2, unsigned char buf[])
