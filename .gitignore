@@ -1,0 +1,6 @@
+mk-createreq
+mk-createreq.exe
+netdubhd-upload
+netdubhd-upload.exe
+src/*.rej
+src/*.orig
