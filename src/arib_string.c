@@ -16,6 +16,7 @@
 #include <string.h>
 #include "arib_string.h"
 #include "arib_char.h"
+#include "arib_addchar.h"
 
 #define CP_JIS2022		(50220)
 
@@ -24,6 +25,9 @@
 #define CONV_SP_CHAR		"\xe3\x80\x80"
 #define CONV_FAIL_CHAR		"\xe2\x96\xa0"
 #define CONV_UNSUPPORT_CHAR	"\xe2\x96\xa1"
+
+
+#define ARRAY_LENGTH(a)		((sizeof (a)) / (sizeof (a)[0]))
 
 #if !USE_WINAPI
 static iconv_t icd = NULL;
@@ -331,6 +335,33 @@ static void set_codeset_drcs(int idx, unsigned char c, int is_double)
 	}
 }
 
+static void convert_additional_symbols(unsigned char c1, unsigned char c2, unsigned char buf[])
+{
+	switch (c1)
+	{
+	case 85:
+		if (ARRAY_LENGTH(arib_addchar85_table) > c2 - 1)
+		{
+			strcpy(buf, arib_addchar85_table[c2 - 1]);
+			return;
+		}
+
+		break;
+
+	case 86:
+		if (ARRAY_LENGTH(arib_addchar86_table) > c2 - 1)
+		{
+			strcpy(buf, arib_addchar86_table[c2 - 1]);
+			return;
+		}
+
+		break;
+	}
+
+	fprintf(stderr, "conversion fail: additional_symbol(%d, %d)\n", c1, c2);
+	strcpy(buf, CONV_FAIL_CHAR);
+}
+
 static void conver_single_char(int codeset, unsigned char c, unsigned char buf[])
 {
 	int c_end = BML_DEL - 1;
@@ -378,62 +409,75 @@ static void conver_single_char(int codeset, unsigned char c, unsigned char buf[]
 	strcpy(buf, CONV_UNSUPPORT_CHAR);
 }
 
-static void convert_double_char(int codeset, unsigned char b, unsigned char b2, unsigned char buf[])
+static void convert_double_char(int codeset, unsigned char c1, unsigned char c2, unsigned char buf[])
 {
-	unsigned char jisBuf[] = { 0x1b, 0x24, 0x42, b, b2, 0x00 };
+	unsigned char jisbuf[8];
 #if USE_WINAPI
-	WCHAR wbuf[2];
+	WCHAR wbuf[3];
 #else
 	char *inp, *outp;
 	size_t insz, outsz;
 #endif
 
- 	b &= 0x7f;
- 	b2 &= 0x7f;
+ 	c1 &= 0x7f;
+ 	c2 &= 0x7f;
+
+	memset(jisbuf, 0, sizeof jisbuf);
 
 	switch (codeset)
 	{
-	case PLANE_KANJI:
 	case PLANE_JIS_KANJI_PLANE_1:
-#if USE_WINAPI
-		if (MultiByteToWideChar(CP_JIS2022, 0, jisBuf, -1, wbuf, 2) == 0)
-		{
-			fprintf(stderr, "conversion fail: JIS(%d, %d): MultiByteToWideChar: %ld\n", b, b2, GetLastError());
-			strcpy(buf, "■");
-			return;
-		}
-		wbuf[1] = '\0';
+	//	sprintf(jisbuf, "\x1b\x24\x28\x51%c%c", c1, c2);
+	//	break;
 
-		if (WideCharToMultiByte(CP_UTF8, 0, wbuf, -1, buf, MAX_CHAR_BYTES + 1, NULL, NULL) == 0)
-		{
-			fprintf(stderr, "conversion fail: JIS(%d, %d): WideCharToMultiByte: %ld\n", b, b2, GetLastError());
-			strcpy(buf, "■");
-			return;
-		}
-#else
-		inp = jisBuf;
-		insz = strlen(inp);
-		outp = buf;
-		outsz = MAX_CHAR_BYTES;
-		if (iconv(icd, &inp, &insz, &outp, &outsz) == -1)
-		{
-			fprintf(stderr, "iconv fail: %d\n", errno);
-			exit(1);
-		};
+	//case PLANE_JIS_KANJI_PLANE_2:
+	//	sprintf(jisbuf, "\x1b\x24\x28\x50%c%c", c1, c2);
+	//	break;
 
-		*outp = '\0';
-#endif
-
-		return;
+	case PLANE_KANJI:
+		sprintf(jisbuf, "\x1b\x24\x42%c%c", c1, c2);
+		break;
 
 	case PLANE_ADDITIONAL_SYMBOLS:
-		//fprintf(stderr, "additional symbol: JIS(%d,%d)\n", b, b2);
-		strcpy(buf, "■");
+		convert_additional_symbols(c1 - BML_SP, c2 - BML_SP, buf);
+		return;
+
+	default:
+		fprintf(stderr, "codeset(0x%x) is not supported\n", codeset);
+		strcpy(buf, CONV_UNSUPPORT_CHAR);
 		return;
 	}
 
-	fprintf(stderr, "codeset(0x%x) is not supported\n", codeset);
-	strcpy(buf, "□");
+#if USE_WINAPI
+	memset(wbuf, 0, sizeof wbuf);
+
+	if (MultiByteToWideChar(CP_JIS2022, 0, jisbuf, -1, wbuf, 3) == 0)
+	{
+		fprintf(stderr, "conversion fail: JIS(%d, %d): MultiByteToWideChar: %ld\n", c1, c2, GetLastError());
+		strcpy(buf, CONV_FAIL_CHAR);
+		return;
+	}
+
+	if (WideCharToMultiByte(CP_UTF8, 0, wbuf, -1, buf, MAX_CHAR_BYTES + 1, NULL, NULL) == 0)
+	{
+		fprintf(stderr, "conversion fail: JIS(%d, %d): WideCharToMultiByte: %ld\n", c1, c2, GetLastError());
+		strcpy(buf, CONV_FAIL_CHAR);
+		return;
+	}
+#else
+	inp = jisbuf;
+	insz = strlen(inp);
+	outp = buf;
+	outsz = MAX_CHAR_BYTES;
+
+	if (iconv(icd, &inp, &insz, &outp, &outsz) == -1)
+	{
+		fprintf(stderr, "iconv fail: JIS(%d, %d): %d\n", c1, c2, errno);
+		exit(1);
+	};
+
+	*outp = '\0';
+#endif
 }
 
 const char *get_arib_string(const unsigned char *s, int len)
