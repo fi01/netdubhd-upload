@@ -224,8 +224,8 @@ void parse_sit(dlna_elements *e, const unsigned char *p)
 
 	case 0xc3:
 		n = 3;
-		if (p[14] & 0x01)
-			n = 15;
+		//if (p[14] & 0x01)
+		//	n = 15;
 
 		{
 			double mdj = p[n] * 256 + p[n + 1];
