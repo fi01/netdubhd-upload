@@ -387,10 +387,11 @@ static void convert_double_char(int codeset, unsigned char b, unsigned char b2, 
 #if USE_WINAPI
 		if (MultiByteToWideChar(CP_JIS2022, 0, jisBuf, -1, wbuf, 2) == 0)
 		{
-			fprintf(stderr, "conversion fail: JIS(%d, %d): WideCharToMultiByte: %ld\n", b, b2, GetLastError());
+			fprintf(stderr, "conversion fail: JIS(%d, %d): MultiByteToWideChar: %ld\n", b, b2, GetLastError());
 			strcpy(buf, "■");
 			return;
 		}
+		wbuf[1] = '\0';
 
 		if (WideCharToMultiByte(CP_UTF8, 0, wbuf, -1, buf, MAX_CHAR_BYTES + 1, NULL, NULL) == 0)
 		{
