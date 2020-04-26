@@ -326,10 +326,19 @@ void parse_sit(dlna_elements *e, const unsigned char *p)
 	case 0x54:
 		len = p[1] + 2;
 
+		free_if_allocated(&e->upnp_genre);
+
 		for (i = 2; i < len; i += 2)
 		{
+			const char *genre = arib_genre_detail_info[p[i] >> 4][p[i] & 0xf];
+			if (!genre)
+				continue;
+
 			free_if_allocated(&e->upnp_genre);
-			e->upnp_genre = strdup(arib_genre_detail_info[p[i] >> 4][p[i] & 0xf]);
+			e->upnp_genre = strdup(genre);
+
+			if ((p[i] & 0xf) != 0x0f)
+				break;
 		}
 
 		break;
