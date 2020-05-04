@@ -544,7 +544,7 @@ const char *get_arib_string(const unsigned char *s, int len)
 			exit(1);
 		}
 
-		if (buflen + MAX_CHAR_BYTES + 1 > bufsize)
+		if (buflen + MAX_CHAR_BYTES + 1 >= bufsize)
 		{
 			unsigned char *p;
 
