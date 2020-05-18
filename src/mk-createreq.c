@@ -506,10 +506,10 @@ int main(int argc, const char *argv[])
 				fprintf(stderr, "calc CRC32: 0x%08lx\n", crc32);
 				fprintf(stderr, "CRC32: 0x%02x%02x%02x%02x\n",
 					sit[seclen + 3 - 4], sit[seclen + 3 - 3], sit[seclen + 3 - 2], sit[seclen + 3 - 1]);
-				fprintf(stderr, "CRC is wrong. ignore this SIT\n");
-				started = 0;
-				buflen = 0;
-				continue;
+				fprintf(stderr, "CRC is wrong, but use this SIT\n");
+				//started = 0;
+				//buflen = 0;
+				//continue;
 			}
 
 			dlna_elements_init(&e);
