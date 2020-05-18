@@ -969,6 +969,8 @@ static int post_image(int sock, const char *basename)
 	static char outbuf[2 * (PCP_DATA_SIZE + PCP_HEADER_SIZE + PCP_MAX_PADDING)];
 	int outbuf_len;
 	FILE *fp;
+	struct stat statbuf;
+	long long total_size;
 	long long size;
 	char *fname;
 	struct timeval tv_s;
@@ -995,6 +997,14 @@ static int post_image(int sock, const char *basename)
 		return 1;
 	}
 
+	if (fstat(fileno(fp), &statbuf))
+	{
+		fprintf(stderr, "\nFailed to get file size: %s\n", fname);
+		return 1;
+	}
+
+	total_size = statbuf.st_size;
+
 	ts_filter = TS_FILTER_init();
 
 	outbuf_len = 0;
@@ -1009,9 +1019,11 @@ static int post_image(int sock, const char *basename)
 
 		if (size == 0)
 			gettimeofday(&tv_s, NULL);
-
-		printf("\r" I64d, size);
-		fflush(stdout);
+		else
+		{
+			printf("\r" I64d "/" I64d " (%3.1f%%)", size, total_size, (double)size * 100.0 / (double)total_size);
+			fflush(stdout);
+		}
 
 		if (outbuf_len < PCP_DATA_SIZE)
 			n = fread(buf, 1, sizeof buf, fp);
