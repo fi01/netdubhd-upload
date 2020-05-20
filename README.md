@@ -16,3 +16,6 @@ Ex)
 ## Compile  
 `gcc -o netdubhd-upload upload_image.c ts-filter.c`  
 `gcc -o mk-createreq mk-createreq.c arib_string.c`
+
+### Note
+For MinGW build, add compile option `-lws2_32` last.
